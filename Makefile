@@ -1,13 +1,14 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O2
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -I./include
+LDFLAGS = -L./lib -llibmysql
 
-SRC = src/main.cpp
+SRCS = src/main.cpp src/database.cpp
 TARGET = cineseat.exe
 
 all: $(TARGET)
 
-$(TARGET): $(SRC)
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRC)
+$(TARGET): $(SRCS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS) $(LDFLAGS)
 
 clean:
 	del /f /q $(TARGET) 2>nul || rm -f $(TARGET)

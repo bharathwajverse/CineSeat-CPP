@@ -1,6 +1,6 @@
 /**
  * CineSeat — Smart Movie Ticket Booking & Waitlist System
- * Academic C++ DSA Mini Project
+ * Academic C++ DSA Mini Project with MySQL Integration
  * Standard: C++17
  *
  * Syllabus Elements Covered:
@@ -10,6 +10,7 @@
  * - STL Containers: vector, queue, stack
  * - Searching: Linear Search by customer name
  * - Sorting: std::sort by customer name
+ * - MySQL Integration: connectDatabase, loadBookings, saveBooking, deleteBooking
  * - Clean menu-driven console interface with robust input validation
  */
 
@@ -21,6 +22,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <limits>
+#include "database.h"
 
 using namespace std;
 
@@ -35,17 +37,8 @@ const double MID_ROW_PRICE   = 200.00; // Rows 2-3
 const double BACK_ROW_PRICE  = 250.00; // Row 4 (VIP/Recliner)
 
 // ==========================================
-// 1. Data Structures
+// 1. Global State & Data Structures
 // ==========================================
-
-struct Booking {
-    int bookingId;
-    string customerName;
-    string movieName;
-    int seatRow;
-    int seatCol;
-    double ticketPrice;
-};
 
 // Global state designed for academic clarity & simplicity
 int seats[ROWS][COLS] = {0}; // 0 = Available, 1 = Booked
@@ -86,6 +79,18 @@ double calculatePrice(int row) {
 void clearInputBuffer() {
     cin.clear();
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
+
+// Synchronize database records into 2D seating matrix at startup
+void syncDatabaseToSeats() {
+    for (const auto& b : bookings) {
+        if (isSeatValid(b.seatRow, b.seatCol)) {
+            seats[b.seatRow][b.seatCol] = 1;
+        }
+        if (b.bookingId >= nextBookingId) {
+            nextBookingId = b.bookingId + 1;
+        }
+    }
 }
 
 // ==========================================
@@ -193,9 +198,10 @@ void bookTicket() {
     newBooking.seatCol = c;
     newBooking.ticketPrice = price;
 
-    // Store in vector and push to undo stack
+    // Store in vector, push to undo stack, and persist in MySQL
     bookings.push_back(newBooking);
     undoStack.push(newBooking);
+    saveBooking(newBooking);
 
     cout << "\nTicket Confirmed!\n";
     cout << "Booking ID  : " << newBooking.bookingId << "\n";
@@ -237,9 +243,10 @@ void cancelTicket() {
     int freedRow = cancelled.seatRow;
     int freedCol = cancelled.seatCol;
 
-    // Free the seat
+    // Free the seat, erase from vector, and delete from MySQL
     seats[freedRow][freedCol] = 0;
     bookings.erase(bookings.begin() + foundIndex);
+    deleteBooking(id);
 
     cout << "Booking ID " << id << " for " << cancelled.customerName << " has been cancelled.\n";
     cout << "Seat Row " << freedRow << ", Col " << freedCol << " is now released.\n";
@@ -262,6 +269,7 @@ void cancelTicket() {
 
         bookings.push_back(autoBooking);
         undoStack.push(autoBooking);
+        saveBooking(autoBooking);
 
         cout << "\n[FIFO Notification] Released seat allocated to first waitlist customer:\n";
         cout << "-> " << nextPerson << " assigned Seat (" << freedRow << ", " << freedCol 
@@ -389,9 +397,10 @@ void undoLastBooking() {
     });
 
     if (it != bookings.end()) {
-        // Free the seat
+        // Free the seat, remove from vector, and delete from MySQL
         seats[last.seatRow][last.seatCol] = 0;
         bookings.erase(it);
+        deleteBooking(last.bookingId);
 
         cout << "Reverted Booking ID #" << last.bookingId << " for " << last.customerName << "!\n";
         cout << "Seat (" << last.seatRow << ", " << last.seatCol << ") is now marked available again.\n";
@@ -426,6 +435,12 @@ int main() {
 
     cout << "\nWelcome to CineSeat — Smart Movie Ticket Booking System!\n";
     cout << "Now Screening: " << FIXED_MOVIE << " (Auditorium 1)\n";
+
+    // Startup: Connect to MySQL, load persisted bookings, and synchronize 2D seat grid
+    if (connectDatabase()) {
+        loadBookings(bookings);
+        syncDatabaseToSeats();
+    }
 
     while (true) {
         printMenu();
@@ -462,6 +477,7 @@ int main() {
                 break;
             case 9:
                 cout << "\nThank you for using CineSeat! Have a great movie experience.\n";
+                closeDatabase();
                 return 0;
             default:
                 cout << "Invalid option (" << choice << "). Please select between 1 and 9.\n";
@@ -469,5 +485,6 @@ int main() {
         }
     }
 
+    closeDatabase();
     return 0;
 }
