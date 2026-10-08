@@ -5,6 +5,13 @@ build/
 *.o
 *.obj
 
+# Binary DLLs & static libraries
+*.dll
+*.lib
+
+# Local configuration with real credentials
+db_config.env
+
 # Editor & OS files
 .vscode/
 .idea/
