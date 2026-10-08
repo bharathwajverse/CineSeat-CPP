@@ -91,19 +91,28 @@
 
 ## 🗄️ Database Integration (MySQL)
 
-A clean single-table schema is provided in [`schema.sql`](file:///g:/Projects/CineSeat/schema.sql):
+A clean single-table schema is provided in [`sql/schema.sql`](file:///g:/Projects/CineSeat/sql/schema.sql):
 
 ```sql
+CREATE DATABASE IF NOT EXISTS cinema_db;
+USE cinema_db;
+
 CREATE TABLE bookings (
     booking_id INT PRIMARY KEY,
     customer_name VARCHAR(100) NOT NULL,
     movie_name VARCHAR(100) NOT NULL,
     seat_row INT NOT NULL,
     seat_col INT NOT NULL,
-    ticket_price DECIMAL(8, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ticket_price DOUBLE NOT NULL
 );
 ```
+
+### Database Operations (`database.h` / `database.cpp`)
+The database code is minimal and structured into 4 easy-to-explain functions:
+1. `connectDatabase()`: Establishes a connection to MySQL using credentials from `db_config.env` (falls back gracefully to offline mode if MySQL is not running).
+2. `loadBookings()`: Executes `SELECT * FROM bookings;` at application startup, populating `vector<Booking>` and marking occupied seats on `seats[5][6]`.
+3. `saveBooking()`: Executes `INSERT INTO bookings ...` when a ticket is confirmed.
+4. `deleteBooking()`: Executes `DELETE FROM bookings WHERE booking_id = ...` when a booking is cancelled or undone.
 
 ---
 
@@ -111,12 +120,22 @@ CREATE TABLE bookings (
 
 ### Prerequisites
 - Any C++17 compliant compiler (`g++`, `clang++`, or MSVC)
-- *Optional*: `make` or `cmake`
+- MySQL Server (optional, runs in local fallback mode if offline)
+
+### Configuration
+Copy `db_config.example.env` to `db_config.env` and enter your MySQL server credentials:
+```ini
+DB_HOST=localhost
+DB_USER=root
+DB_PASS=your_password
+DB_NAME=cinema_db
+DB_PORT=3306
+```
 
 ### Compilation using g++
 ```bash
-# Compile
-g++ -std=c++17 -Wall -Wextra -O2 -o cineseat.exe src/main.cpp
+# Compile with MySQL client library
+g++ -std=c++17 -Wall -Wextra -O2 -I./include -L./lib -o cineseat.exe src/main.cpp src/database.cpp -llibmysql
 
 # Run
 ./cineseat.exe
@@ -126,13 +145,6 @@ g++ -std=c++17 -Wall -Wextra -O2 -o cineseat.exe src/main.cpp
 ```bash
 make
 make run
-```
-
-### Using CMake
-```bash
-mkdir build && cd build
-cmake ..
-cmake --build .
 ```
 
 ---
